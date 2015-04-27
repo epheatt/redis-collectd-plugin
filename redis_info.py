@@ -139,6 +139,16 @@ def configure_callback(conf):
 
     CONFIGS.append( { 'host': host, 'port': port, 'auth':auth, 'instance':instance } )
 
+def parse_value(str,type):
+    try:
+        if type == 'gauge':
+            return float(str)
+        else:
+            return int(float(str))
+    except:
+        log_verbose(e)
+    return 0
+
 def dispatch_value(info, key, type, plugin_instance=None, type_instance=None):
     """Read a key from info response data and dispatch a value"""
     if key not in info:
@@ -152,9 +162,8 @@ def dispatch_value(info, key, type, plugin_instance=None, type_instance=None):
     if not type_instance:
         type_instance = key
 
-    value = int(info[key])
+    value = parse_value(info[key],type)
     log_verbose('Sending value: %s=%s' % (type_instance, value))
-
     val = collectd.Values(plugin='redis_info')
     val.type = type
     val.type_instance = type_instance
@@ -178,17 +187,28 @@ def get_metrics( conf ):
         plugin_instance = '{host}:{port}'.format(host=conf['host'], port=conf['port'])
 
     # send high-level values
-    dispatch_value(info, 'uptime_in_seconds','gauge', plugin_instance)
-    dispatch_value(info, 'connected_clients', 'gauge', plugin_instance)
-    dispatch_value(info, 'connected_slaves', 'gauge', plugin_instance)
-    dispatch_value(info, 'blocked_clients', 'gauge', plugin_instance)
-    dispatch_value(info, 'evicted_keys', 'gauge', plugin_instance)
+    dispatch_value(info, 'uptime_in_seconds','counter', plugin_instance)
+    dispatch_value(info, 'connected_clients', 'counter', plugin_instance)
+    dispatch_value(info, 'connected_slaves', 'counter', plugin_instance)
+    dispatch_value(info, 'blocked_clients', 'counter', plugin_instance)
+    dispatch_value(info, 'evicted_keys', 'counter', plugin_instance)
+    dispatch_value(info, 'expired_keys', 'counter', plugin_instance)
     dispatch_value(info, 'used_memory', 'bytes', plugin_instance)
-    dispatch_value(info, 'changes_since_last_save', 'gauge', plugin_instance)
+    dispatch_value(info, 'used_memory_rss', 'bytes', plugin_instance)
+    dispatch_value(info, 'used_memory_peak', 'bytes', plugin_instance)
+    dispatch_value(info, 'mem_fragmentation_ratio', 'gauge', plugin_instance)
+    dispatch_value(info, 'changes_since_last_save', 'counter', plugin_instance)
     dispatch_value(info, 'total_connections_received', 'counter', plugin_instance,
                    'connections_received')
     dispatch_value(info, 'total_commands_processed', 'counter', plugin_instance,
                    'commands_processed')
+
+    dispatch_value(info, 'instantaneous_ops_per_sec', 'counter', plugin_instance,
+                   'instantaneous_ops')
+    dispatch_value(info, 'rejected_connections', 'counter', plugin_instance)
+    dispatch_value(info, 'pubsub_channels', 'counter', plugin_instance)
+    dispatch_value(info, 'pubsub_patterns', 'counter', plugin_instance)
+    dispatch_value(info, 'latest_fork_usec', 'counter', plugin_instance)
 
     # send keyspace hits and misses, if they exist
     if 'keyspace_hits' in info: dispatch_value(info, 'keyspace_hits', 'derive', plugin_instance)
@@ -206,7 +226,7 @@ def get_metrics( conf ):
         if key.startswith('vm_stats_'):
             dispatch_value(info, key, 'gauge', plugin_instance)
         if key.startswith('db'):
-            dispatch_value(info[key], 'keys', 'gauge', plugin_instance, '%s-keys' % key)
+            dispatch_value(info[key], 'keys', 'counter', plugin_instance, '%s-keys' % key)
         if key.startswith('slave'):
             dispatch_value(info[key], 'delay', 'gauge', plugin_instance, '%s-delay' % key)
 
@@ -214,6 +234,7 @@ def log_verbose(msg):
     if not VERBOSE_LOGGING:
         return
     collectd.info('redis plugin [verbose]: %s' % msg)
+    #print 'redis plugin [verbose]: {0}'.format(msg)
 
 
 # register callbacks
